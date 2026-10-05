@@ -1,5 +1,5 @@
 // ==========================================
-// KONEKSI SUPABASE CLOUD
+// KONEKSI SUPABASE CLOUD[cite: 4]
 // ==========================================
 const SUPABASE_URL = 'https://xnfdvmxbklqelwvxzygp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZmR2bXhia2xxZWx3dnh6eWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2NDgwMzQsImV4cCI6MjEwNTIyNDAzNH0.c6rY_GA0vBjGMnUQc9xDPKSYC1sB1fNiYZU1kVbKt2Q';
@@ -13,7 +13,6 @@ try {
 
 let currentUser = null;
 
-// Cek Sesi Persisten saat Browser Dimuat
 window.addEventListener('DOMContentLoaded', () => {
     const savedUser = localStorage.getItem('autopilot_current_user');
     if (savedUser) {
@@ -33,7 +32,7 @@ function setupEnterListeners() {
     const rPass = document.getElementById('reset-pass');
     const sInput = document.getElementById('search-input');
     const sOldInput = document.getElementById('search-old-input');
-    const sIncInput = document.getElementById('search-incident-input');
+    const sIncInput = document.getElementById('search-inc-input');
 
     if(lUser) lUser.addEventListener('keypress', e => { if(e.key === 'Enter') lPass.focus(); });
     if(lPass) lPass.addEventListener('keypress', e => { if(e.key === 'Enter') handleLogin(); });
@@ -45,7 +44,6 @@ function setupEnterListeners() {
     if(sIncInput) sIncInput.addEventListener('keypress', e => { if(e.key === 'Enter') renderIncidents(); });
 }
 
-// Fungsi Pencatatan Log Aktivitas Web
 async function logActivity(username, actionText) {
     if (!supabaseClient) return;
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
@@ -57,7 +55,7 @@ async function logActivity(username, actionText) {
 }
 
 // ==========================================
-// 1. AUTENTIKASI & LOGIN SISTEM
+// 1. AUTENTIKASI & LOGIN SISTEM[cite: 4]
 // ==========================================
 function toggleAuth(view) {
     document.getElementById('login-card').classList.add('hidden');
@@ -78,11 +76,6 @@ async function handleLogin() {
     
     if (!user || !pass) {
         alert("Username dan Password wajib diisi!");
-        return;
-    }
-
-    if (!supabaseClient || SUPABASE_URL.includes('ISI_DENGAN')) {
-        alert("Konfigurasi Supabase URL dan Anon Key belum diisi di file script.js!");
         return;
     }
 
@@ -184,13 +177,13 @@ function logout() {
     currentUser = null;
     localStorage.removeItem('autopilot_current_user');
     document.getElementById('app-section').classList.add('hidden');
-    document.getElementById('auth-section').classList.remove('hidden');
+    document.getElementById('auth-section').classList.add('flex-center');
     document.querySelectorAll('.input-form').forEach(el => el.value = '');
     toggleAuth('login');
 }
 
 // ==========================================
-// 2. INISIALISASI & DASHBOARD
+// 2. INISIALISASI & DASHBOARD[cite: 4]
 // ==========================================
 async function initApp() {
     if(!currentUser) return;
@@ -213,22 +206,14 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(`tab-${tabName}`).classList.add('active');
-    event.currentTarget.classList.add('active');
-
-    // Atur Dashboard Header Stat yang tampil sesuai tab
-    const statDev = document.getElementById('stats-tab-device');
-    const statOld = document.getElementById('stats-tab-old');
-
-    if (tabName === 'device') {
-        statDev.classList.remove('hidden');
-        statOld.classList.add('hidden');
-    } else if (tabName === 'old-device') {
-        statDev.classList.add('hidden');
-        statOld.classList.remove('hidden');
-    } else {
-        statDev.classList.add('hidden');
-        statOld.classList.add('hidden');
-    }
+    
+    // Aktifkan button tab visual
+    const buttons = document.querySelectorAll('.tab-btn');
+    buttons.forEach(btn => {
+        if(btn.getAttribute('onclick')?.includes(tabName)) {
+            btn.classList.add('active');
+        }
+    });
 }
 
 async function updateDashboardStats() {
@@ -242,25 +227,10 @@ async function updateDashboardStats() {
     document.getElementById('stat-deploy').innerText = devices.filter(d => d.status === 'Done deploy user').length;
 }
 
-async function updateOldDashboardStats() {
-    const { data: oldDevices } = await supabaseClient.from('old_devices').select('*');
-    if(!oldDevices) return;
-
-    document.getElementById('old-stat-total').innerText = oldDevices.length;
-    document.getElementById('old-stat-done').innerText = oldDevices.filter(d => d.status_bast === 'done').length;
-    document.getElementById('old-stat-pending').innerText = oldDevices.filter(d => d.status_bast === 'pending').length;
-    document.getElementById('old-stat-belum').innerText = oldDevices.filter(d => d.status_bast === 'belum BAST').length;
-}
-
 function setStatFilter(status) {
     document.getElementById('filter-status-select').value = status;
     switchTab('device');
     renderDevices();
-}
-
-function setOldBastFilter(bast) {
-    document.getElementById('filter-bast-select').value = bast;
-    renderOldDevices();
 }
 
 function formatTanggalIndo(dateString) {
@@ -278,7 +248,7 @@ function formatTanggalIndo(dateString) {
 }
 
 // ==========================================
-// 3. CRUD DEVICES (DEPLOY) & VALIDASI DUPLIKASI
+// 3. CRUD DEVICES (DEPLOY) & VALIDASI DUPLIKASI[cite: 4]
 // ==========================================
 function getStatusBadge(status) {
     if(status === 'Belum di setup') return `<span class="badge badge-belum">${status}</span>`;
@@ -387,7 +357,7 @@ async function saveDevice() {
         }
 
         await supabaseClient.from('devices').update({
-            nama, sn, email, team, alamat, tanggal, status, history: historyLog
+            nama, sn, email, team, alamat, tanggal, status, history: historyLog, updated_at: new Date()
         }).eq('id', id);
 
         await logActivity(currentUser.username, `Mengupdate data device SN: ${sn}`);
@@ -436,7 +406,7 @@ async function deleteDevice(id) {
 }
 
 // ==========================================
-// 4. REPORT STATUS DEVICE LAMA & DASHBOARD
+// 4. TAMPILAN KE-2: REPORT STATUS DEVICE LAMA & DASHBOARD
 // ==========================================
 function getBastBadge(bast) {
     if(bast === 'done') return `<span class="badge badge-bast-done">Done</span>`;
@@ -444,22 +414,33 @@ function getBastBadge(bast) {
     return `<span class="badge badge-bast-belum">Belum BAST</span>`;
 }
 
+async function updateOldDashboardStats(list) {
+    document.getElementById('old-stat-total').innerText = list.length;
+    document.getElementById('old-stat-done').innerText = list.filter(d => d.status_bast === 'done').length;
+    document.getElementById('old-stat-pending').innerText = list.filter(d => d.status_bast === 'pending').length;
+    document.getElementById('old-stat-belum').innerText = list.filter(d => d.status_bast === 'belum BAST' || !d.status_bast).length;
+}
+
+function filterOldBast(bastStatus) {
+    document.getElementById('filter-bast-select').value = bastStatus;
+    renderOldDevices();
+}
+
 async function renderOldDevices() {
     const { data: oldList, error } = await supabaseClient.from('old_devices').select('*');
     if (error) { console.error(error); return; }
 
+    let list = oldList || [];
+    updateOldDashboardStats(list);
+
     const tbody = document.getElementById('table-old-device');
     tbody.innerHTML = '';
 
-    let list = oldList || [];
-
-    // Filter BAST
     const bastFilter = document.getElementById('filter-bast-select').value;
     if (bastFilter !== 'All') {
         list = list.filter(d => d.status_bast === bastFilter);
     }
 
-    // Search
     const searchVal = document.getElementById('search-old-input').value.toLowerCase().trim();
     if (searchVal) {
         list = list.filter(d => 
@@ -488,7 +469,6 @@ async function renderOldDevices() {
             </tr>
         `;
     });
-    updateOldDashboardStats();
 }
 
 async function saveOldDevice() {
@@ -556,45 +536,48 @@ async function exportOldExcel() {
 }
 
 // ==========================================
-// 5. NOTE SUMMARY INCIDENT & PROBLEM
+// 5. TAMPILAN KE-3: SUMMARY INCIDENT, PROBLEM DEPLOYMENT & CATATAN
 // ==========================================
-function getIncidentBadge(cat) {
-    if(cat === 'Incident') return `<span class="badge badge-incident">${cat}</span>`;
-    return `<span class="badge badge-problem">${cat}</span>`;
+async function updateIncidentStats(list) {
+    document.getElementById('inc-stat-total').innerText = list.length;
+    document.getElementById('inc-stat-incident').innerText = list.filter(i => i.kategori === 'Incident').length;
+    document.getElementById('inc-stat-problem').innerText = list.filter(i => i.kategori === 'Problem Deployment').length;
 }
 
 async function renderIncidents() {
-    const { data: notes, error } = await supabaseClient.from('incident_notes').select('*');
+    const { data: incList, error } = await supabaseClient.from('incidents').select('*');
     if (error) { console.error(error); return; }
+
+    let list = incList || [];
+    updateIncidentStats(list);
 
     const tbody = document.getElementById('table-incident');
     tbody.innerHTML = '';
 
-    let list = notes || [];
-
-    const catFilter = document.getElementById('filter-incident-cat').value;
+    const catFilter = document.getElementById('filter-inc-cat').value;
     if (catFilter !== 'All') {
-        list = list.filter(n => n.kategori === catFilter);
+        list = list.filter(i => i.kategori === catFilter);
     }
 
-    const searchVal = document.getElementById('search-incident-input').value.toLowerCase().trim();
+    const searchVal = document.getElementById('search-inc-input').value.toLowerCase().trim();
     if (searchVal) {
-        list = list.filter(n => 
-            (n.judul && n.judul.toLowerCase().includes(searchVal)) || 
-            (n.deskripsi && n.deskripsi.toLowerCase().includes(searchVal))
+        list = list.filter(i => 
+            (i.judul && i.judul.toLowerCase().includes(searchVal)) || 
+            (i.deskripsi && i.deskripsi.toLowerCase().includes(searchVal))
         );
     }
 
-    list.forEach(n => {
+    list.forEach(i => {
+        const catBadge = i.kategori === 'Incident' ? '<span class="badge badge-belum">Incident</span>' : '<span class="badge badge-progress">Problem Deployment</span>';
         tbody.innerHTML += `
             <tr>
-                <td><small>${n.tanggal_catat || '-'}</small></td>
-                <td><strong>${n.judul || ''}</strong><br>${getIncidentBadge(n.kategori)}</td>
-                <td><div style="max-height:80px; overflow-y:auto; line-height:1.4;">${n.deskripsi || ''}</div></td>
-                <td><strong>${n.status || 'Open'}</strong></td>
+                <td>${catBadge}</td>
+                <td><strong>${i.judul || ''}</strong><br><small class="text-muted">${i.deskripsi || ''}</small></td>
+                <td><div class="history-container-modal">${i.catatan || '-'}</div></td>
+                <td><strong>${formatTanggalIndo(i.tanggal)}</strong></td>
                 <td>
-                    <button class="btn btn-warning" style="padding:5px 6px; font-size:11px;" onclick="editIncident(${n.id})">Edit</button>
-                    <button class="btn btn-danger" style="padding:5px 6px; font-size:11px;" onclick="deleteIncident(${n.id})">Del</button>
+                    <button class="btn btn-warning" style="padding:5px 6px; font-size:11px;" onclick="editIncident(${i.id})">Edit</button>
+                    <button class="btn btn-danger" style="padding:5px 6px; font-size:11px;" onclick="deleteIncident(${i.id})">Del</button>
                 </td>
             </tr>
         `;
@@ -603,25 +586,25 @@ async function renderIncidents() {
 
 async function saveIncident() {
     const id = document.getElementById('inc-id').value;
+    const kategori = document.getElementById('inc-cat').value;
     const judul = document.getElementById('inc-judul').value.trim();
-    const kategori = document.getElementById('inc-kategori').value;
-    const status = document.getElementById('inc-status').value;
-    const deskripsi = document.getElementById('inc-deskripsi').value.trim();
-    const tanggal_catat = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const deskripsi = document.getElementById('inc-desk').value.trim();
+    const catatan = document.getElementById('inc-catatan').value.trim();
+    const tanggal = document.getElementById('inc-tgl').value;
 
-    if (!judul || !deskripsi) {
-        alert("Judul dan Deskripsi catatan wajib diisi!");
+    if (!judul) {
+        alert("Judul Isu wajib diisi!");
         return;
     }
 
-    const data = { judul, kategori, status, deskripsi, tanggal_catat };
+    const data = { kategori, judul, deskripsi, catatan, tanggal };
 
     if (id) {
-        await supabaseClient.from('incident_notes').update(data).eq('id', id);
-        await logActivity(currentUser.username, `Mengupdate note incident: ${judul}`);
+        await supabaseClient.from('incidents').update(data).eq('id', id);
+        await logActivity(currentUser.username, `Mengupdate catatan incident/problem ID: ${id}`);
     } else {
-        await supabaseClient.from('incident_notes').insert([data]);
-        await logActivity(currentUser.username, `Menambah note incident baru: ${judul}`);
+        await supabaseClient.from('incidents').insert([data]);
+        await logActivity(currentUser.username, `Menambah catatan incident/problem baru: ${judul}`);
     }
 
     closeModal('modal-incident');
@@ -629,27 +612,28 @@ async function saveIncident() {
 }
 
 async function editIncident(id) {
-    const { data } = await supabaseClient.from('incident_notes').select('*').eq('id', id).single();
+    const { data } = await supabaseClient.from('incidents').select('*').eq('id', id).single();
     if(data) {
-        document.getElementById('title-incident').innerText = 'Edit Note Summary Incident';
+        document.getElementById('title-incident').innerText = 'Edit Incident & Problem';
         document.getElementById('inc-id').value = data.id;
+        document.getElementById('inc-cat').value = data.kategori;
         document.getElementById('inc-judul').value = data.judul;
-        document.getElementById('inc-kategori').value = data.kategori;
-        document.getElementById('inc-status').value = data.status;
-        document.getElementById('inc-deskripsi').value = data.deskripsi;
+        document.getElementById('inc-desk').value = data.deskripsi;
+        document.getElementById('inc-catatan').value = data.catatan;
+        document.getElementById('inc-tgl').value = data.tanggal;
         document.getElementById('modal-incident').classList.remove('hidden');
     }
 }
 
 async function deleteIncident(id) {
     if(confirm("Hapus catatan ini?")) {
-        await supabaseClient.from('incident_notes').delete().eq('id', id);
+        await supabaseClient.from('incidents').delete().eq('id', id);
         renderIncidents();
     }
 }
 
 // ==========================================
-// 6. RIWAYAT AKTIVITAS & MODAL
+// 6. RIWAYAT AKTIVITAS & MODAL[cite: 4]
 // ==========================================
 async function openActivityModal() {
     document.getElementById('modal-activity').classList.remove('hidden');
@@ -676,7 +660,7 @@ async function switchActivityTab(tab) {
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${d.nama}</strong><br><small class="text-muted">SN: ${d.sn}</small></td>
-                        <td><div style="max-height:60px; overflow-y:auto; background:#000; padding:4px; font-size:11px; color:#888;">${d.history || 'Belum ada riwayat.'}</div></td>
+                        <td><div class="history-container-modal">${d.history || 'Belum ada riwayat.'}</div></td>
                     </tr>
                 `;
             });
@@ -705,7 +689,7 @@ async function switchActivityTab(tab) {
 }
 
 // ==========================================
-// 7. CRUD USERS & RESET 2FA
+// 7. CRUD USERS & RESET 2FA[cite: 2, 4]
 // ==========================================
 async function renderUsers() {
     const { data: users } = await supabaseClient.from('app_users').select('*');
@@ -787,7 +771,7 @@ async function deleteUser(id, uname) {
 }
 
 // ==========================================
-// 8. MODALS & EXCEL EXPORT/IMPORT
+// 8. MODALS & EXCEL EXPORT/IMPORT[cite: 4]
 // ==========================================
 function openModal(modalId) {
     document.getElementById(modalId).classList.remove('hidden');
@@ -813,12 +797,13 @@ function openModal(modalId) {
         document.getElementById('old-pengembalian').value = '';
         document.getElementById('old-bast').value = 'belum BAST';
     } else if(modalId === 'modal-incident') {
-        document.getElementById('title-incident').innerText = 'Form Note Summary Incident & Problem';
+        document.getElementById('title-incident').innerText = 'Form Incident & Problem';
         document.getElementById('inc-id').value = '';
+        document.getElementById('inc-cat').value = 'Incident';
         document.getElementById('inc-judul').value = '';
-        document.getElementById('inc-kategori').value = 'Incident';
-        document.getElementById('inc-status').value = 'Open';
-        document.getElementById('inc-deskripsi').value = '';
+        document.getElementById('inc-desk').value = '';
+        document.getElementById('inc-catatan').value = '';
+        document.getElementById('inc-tgl').value = new Date().toISOString().split('T')[0];
     } else if(modalId === 'modal-user') {
         document.getElementById('title-user').innerText = 'Tambah Akun Akses Baru';
         document.getElementById('usr-id').value = '';
