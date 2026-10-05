@@ -1,8 +1,8 @@
 // ==========================================
 // KONEKSI SUPABASE CLOUD
 // ==========================================
-const SUPABASE_URL = 'https://xnfdvmxbklqelwvxzygp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZmR2bXhia2xxZWx3dnh6eWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2NDgwMzQsImV4cCI6MjEwNTIyNDAzNH0.c6rY_GA0vBjGMnUQc9xDPKSYC1sB1fNiYZU1kVbKt2Q';
+const SUPABASE_URL = 'https://wdflnygmtahjlxakffmx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZmxueWdtdGFoamx4YWtmZm14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MzkwMDYsImV4cCI6MjEwNjUxNTAwNn0.WDew8ANewwl0hKLU-gCP5-hDZM-mXtIQZWaKbaHhd_A';
 
 let supabaseClient = null;
 try {
@@ -13,7 +13,6 @@ try {
 
 let currentUser = null;
 
-// Cek Sesi Persisten saat Browser Dimuat
 window.addEventListener('DOMContentLoaded', () => {
     const savedUser = localStorage.getItem('autopilot_current_user');
     if (savedUser) {
@@ -43,7 +42,6 @@ function setupEnterListeners() {
     if(sOldInput) sOldInput.addEventListener('keypress', e => { if(e.key === 'Enter') renderOldDevices(); });
 }
 
-// Log Aktivitas
 async function logActivity(username, actionText) {
     if (!supabaseClient) return;
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
@@ -75,15 +73,15 @@ async function handleLogin() {
     const pass = document.getElementById('login-pass').value.trim();
     
     if (!user || !pass) return alert("Username dan Password wajib diisi!");
-    if (!supabaseClient || SUPABASE_URL.includes('ISI_DENGAN')) return alert("Supabase URL belum dikonfigurasi!");
+    if (!supabaseClient || SUPABASE_URL.includes('ISI_DENGAN')) return alert("Konfigurasi Supabase URL dan Anon Key belum diisi di file script.js!");
 
     try {
         const { data: users, error } = await supabaseClient.from('app_users').select('*').eq('username', user).eq('password', pass);
         if (error) return alert("Database Error: " + error.message);
+        
         if (!users || users.length === 0) {
-            alert("Login Gagal: Username atau Password salah!");
             await logActivity(user, "Gagal login (kredensial salah)");
-            return;
+            return alert("Login Gagal: Username atau Password salah!");
         }
 
         currentUser = users[0];
@@ -122,18 +120,19 @@ async function handle2FA() {
             currentUser.is_2fa_setup = true;
         }
         localStorage.setItem('autopilot_current_user', JSON.stringify(currentUser));
-        await logActivity(currentUser.username, "Berhasil Login (2FA terverifikasi)");
+        await logActivity(currentUser.username, "Berhasil Login ke sistem (2FA terverifikasi)");
         document.getElementById('auth-section').classList.add('hidden');
         document.getElementById('app-section').classList.remove('hidden');
         initApp();
     } else {
-        alert("Kode 2FA tidak valid!");
+        alert("Kode 2FA tidak valid! Harap masukkan 6 digit angka.");
     }
 }
 
 async function handleReset() {
     const user = document.getElementById('reset-user').value.trim();
     const newPass = document.getElementById('reset-pass').value.trim();
+    
     if(!user || !newPass) return alert("Harap isi Username dan Password Baru!");
 
     const { data, error } = await supabaseClient.from('app_users').update({ password: newPass }).eq('username', user).select();
@@ -179,11 +178,18 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(`tab-${tabName}`).classList.add('active');
     event.currentTarget.classList.add('active');
+    
+    if (tabName !== 'device') {
+        document.getElementById('dashboard-stats-container').style.display = 'none';
+    } else {
+        document.getElementById('dashboard-stats-container').style.display = 'grid';
+    }
 }
 
 async function updateDashboardStats() {
     const { data: devices } = await supabaseClient.from('devices').select('*');
     if(!devices) return;
+    
     document.getElementById('stat-total').innerText = devices.length;
     document.getElementById('stat-belum').innerText = devices.filter(d => d.status === 'Belum di setup').length;
     document.getElementById('stat-progress').innerText = devices.filter(d => d.status === 'On progress').length;
@@ -207,7 +213,7 @@ function formatTanggalIndo(dateString) {
 }
 
 // ==========================================
-// 3. CRUD DEVICES (DEPLOY BARU)
+// 3. CRUD DEVICES (DEPLOY BARU) & VALIDASI DUPLIKASI
 // ==========================================
 function getStatusBadge(status) {
     if(status === 'Belum di setup') return `<span class="badge badge-belum">${status}</span>`;
@@ -219,7 +225,8 @@ function getStatusBadge(status) {
 
 async function renderDevices() {
     const { data: devices, error } = await supabaseClient.from('devices').select('*');
-    if (error) return;
+    if (error) return console.error(error);
+
     const tbody = document.getElementById('table-device');
     tbody.innerHTML = '';
     let list = devices || [];
@@ -237,11 +244,7 @@ async function renderDevices() {
     }
 
     const sortVal = document.getElementById('sort-date-select').value;
-    list.sort((a, b) => {
-        const dateA = a.tanggal || '';
-        const dateB = b.tanggal || '';
-        return sortVal === 'oldest' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-    });
+    list.sort((a, b) => sortVal === 'oldest' ? (a.tanggal || '').localeCompare(b.tanggal || '') : (b.tanggal || '').localeCompare(a.tanggal || ''));
 
     list.forEach(d => {
         tbody.innerHTML += `
@@ -282,8 +285,8 @@ async function saveDevice() {
     const duplicateSN = allDevices.find(d => d.sn.toLowerCase() === sn.toLowerCase() && d.id != id);
     const duplicateEmail = allDevices.find(d => d.email.toLowerCase() === email.toLowerCase() && d.id != id);
 
-    if (duplicateSN) return alert(`Peringatan Duplikasi: Serial Number "${sn}" sudah terdaftar!`);
-    if (duplicateEmail) return alert(`Peringatan Duplikasi: Email "${email}" sudah terdaftar!`);
+    if (duplicateSN) return alert(`PENTING (Duplicate Values): Serial Number "${sn}" sudah terdaftar atas nama "${duplicateSN.nama}"!`);
+    if (duplicateEmail) return alert(`PENTING (Duplicate Values): Email "${email}" sudah terdaftar atas nama "${duplicateEmail.nama}"!`);
 
     const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -295,11 +298,11 @@ async function saveDevice() {
             historyLog = historyLog ? newUpdate + '<br>' + historyLog : newUpdate;
         }
         await supabaseClient.from('devices').update({ nama, sn, email, team, alamat, tanggal, status, history: historyLog }).eq('id', id);
-        await logActivity(currentUser.username, `Mengupdate data device SN: ${sn} (${nama})`);
+        await logActivity(currentUser.username, `Mengupdate data device SN: ${sn}`);
     } else {
         const newHistory = `• Data dibuat oleh <em>${currentUser.username}</em> pada ${nowStr}`;
         await supabaseClient.from('devices').insert([{ nama, sn, email, team, alamat, tanggal, status, history: newHistory }]);
-        await logActivity(currentUser.username, `Menambah device baru SN: ${sn} (${nama})`);
+        await logActivity(currentUser.username, `Menambah device baru SN: ${sn}`);
     }
     
     closeModal('modal-device');
@@ -323,10 +326,10 @@ async function editDevice(id) {
 }
 
 async function clearHistory(id) {
-    if(confirm("Apakah Anda yakin ingin mereset/menghapus Riwayat Status Update untuk device ini?")) {
+    if(confirm("Reset Riwayat Status Update untuk device ini?")) {
         const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
         await supabaseClient.from('devices').update({ history: `• Riwayat direset oleh ${currentUser.username} pada ${nowStr}` }).eq('id', id);
-        await logActivity(currentUser.username, `Mereset riwayat status device ID: ${id}`);
+        await logActivity(currentUser.username, `Merreset riwayat status device ID: ${id}`);
         renderDevices();
     }
 }
@@ -350,7 +353,8 @@ function getBastBadge(bast) {
 
 async function renderOldDevices() {
     const { data: oldList, error } = await supabaseClient.from('old_devices').select('*');
-    if (error) return;
+    if (error) return console.error(error);
+
     const tbody = document.getElementById('table-old-device');
     tbody.innerHTML = '';
     let list = oldList || [];
@@ -364,7 +368,8 @@ async function renderOldDevices() {
             (d.sn && d.sn.toLowerCase().includes(searchVal)) || 
             (d.nama && d.nama.toLowerCase().includes(searchVal)) ||
             (d.divisi && d.divisi.toLowerCase().includes(searchVal)) ||
-            (d.lokasi && d.lokasi.toLowerCase().includes(searchVal))
+            (d.lokasi && d.lokasi.toLowerCase().includes(searchVal)) ||
+            (d.email && d.email.toLowerCase().includes(searchVal))
         );
     }
 
@@ -404,11 +409,12 @@ async function saveOldDevice() {
 
     if (id) {
         await supabaseClient.from('old_devices').update(data).eq('id', id);
-        await logActivity(currentUser.username, `Mengupdate data device lama SN: ${sn}`);
+        await logActivity(currentUser.username, `Mengupdate device lama SN: ${sn}`);
     } else {
         await supabaseClient.from('old_devices').insert([data]);
-        await logActivity(currentUser.username, `Menambah data device lama SN: ${sn}`);
+        await logActivity(currentUser.username, `Menambah device lama SN: ${sn}`);
     }
+
     closeModal('modal-old-device');
     renderOldDevices();
 }
@@ -472,12 +478,10 @@ async function switchActivityTab(tab) {
         tbody.innerHTML = '';
         if (devices) {
             devices.forEach(d => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td><strong>${d.nama}</strong><br><small class="text-muted">SN: ${d.sn}</small></td>
-                        <td><div class="history-container-modal">${d.history || 'Belum ada riwayat.'}</div></td>
-                    </tr>
-                `;
+                tbody.innerHTML += `<tr>
+                    <td><strong>${d.nama}</strong><br><small class="text-muted">SN: ${d.sn}</small></td>
+                    <td><div class="history-container-modal">${d.history || 'Belum ada riwayat.'}</div></td>
+                </tr>`;
             });
         }
     } else {
@@ -491,13 +495,11 @@ async function switchActivityTab(tab) {
         tbody.innerHTML = '';
         if (logs) {
             logs.forEach(l => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td><small>${l.timestamp}</small></td>
-                        <td><strong class="text-primary">${l.username}</strong></td>
-                        <td>${l.action}</td>
-                    </tr>
-                `;
+                tbody.innerHTML += `<tr>
+                    <td><small>${l.timestamp}</small></td>
+                    <td><strong class="text-primary">${l.username}</strong></td>
+                    <td>${l.action}</td>
+                </tr>`;
             });
         }
     }
@@ -537,7 +539,7 @@ async function resetUser2FA(id, uname) {
         const { error } = await supabaseClient.from('app_users').update({ is_2fa_setup: false }).eq('id', id);
         if(!error) {
             alert("Status 2FA berhasil direset!");
-            await logActivity(currentUser.username, `Mereset status 2FA user: ${uname}`);
+            await logActivity(currentUser.username, `Merreset status 2FA user: ${uname}`);
             renderUsers();
         }
     }
@@ -551,7 +553,12 @@ async function saveUser() {
 
     if(!user || !pass) return alert("Username & Password harus diisi!");
 
+    const { data: allUsers } = await supabaseClient.from('app_users').select('*');
+    const dupUser = allUsers.find(u => u.username.toLowerCase() === user.toLowerCase() && u.id != id);
+    if (dupUser) return alert(`Duplicate Values Warning: Username "${user}" sudah terdaftar!`);
+
     const data = { username: user, password: pass, role: role };
+
     if (id) {
         await supabaseClient.from('app_users').update(data).eq('id', id);
         await logActivity(currentUser.username, `Mengupdate user: ${user}`);
@@ -559,6 +566,7 @@ async function saveUser() {
         await supabaseClient.from('app_users').insert([{ ...data, is_2fa_setup: false }]);
         await logActivity(currentUser.username, `Menambah user: ${user}`);
     }
+
     closeModal('modal-user');
     renderUsers();
 }
@@ -618,7 +626,9 @@ function openModal(modalId) {
     }
 }
 
-function closeModal(modalId) { document.getElementById(modalId).classList.add('hidden'); }
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+}
 
 async function exportExcel() {
     const { data: devices } = await supabaseClient.from('devices').select('*');
@@ -633,20 +643,27 @@ async function exportExcel() {
 async function importExcel(event) {
     const file = event.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = async function(e) {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, {type: 'array'});
         const sheetName = workbook.SheetNames[0];
         const importedData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        
         if (importedData.length > 0) {
             const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
             const mappedData = importedData.map(item => ({
-                nama: item.nama || '', sn: item.sn || '', email: item.email || '',
-                team: item.team || '-', alamat: item.alamat || '',
+                nama: item.nama || '',
+                sn: item.sn || '',
+                email: item.email || '',
+                team: item.team || '-',
+                alamat: item.alamat || '',
                 tanggal: item.tanggal || new Date().toISOString().split('T')[0],
-                status: item.status || 'Belum di setup', history: `• Diimpor dari Excel oleh ${currentUser.username} pada ${nowStr}`
+                status: item.status || 'Belum di setup',
+                history: `• Diimpor dari Excel oleh ${currentUser.username} pada ${nowStr}`
             }));
+            
             await supabaseClient.from('devices').insert(mappedData);
             renderDevices();
             await logActivity(currentUser.username, `Mengimpor ${importedData.length} data deploy dari Excel`);
