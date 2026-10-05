@@ -13,7 +13,6 @@ try {
 
 let currentUser = null;
 
-// Cek Sesi Persisten saat Browser Dimuat
 window.addEventListener('DOMContentLoaded', () => {
     const savedUser = localStorage.getItem('autopilot_current_user');
     if (savedUser) {
@@ -32,7 +31,6 @@ function setupEnterListeners() {
     const rUser = document.getElementById('reset-user');
     const rPass = document.getElementById('reset-pass');
     const sInput = document.getElementById('search-input');
-    const sOldInput = document.getElementById('search-old-input');
 
     if(lUser) lUser.addEventListener('keypress', e => { if(e.key === 'Enter') lPass.focus(); });
     if(lPass) lPass.addEventListener('keypress', e => { if(e.key === 'Enter') handleLogin(); });
@@ -40,7 +38,6 @@ function setupEnterListeners() {
     if(rUser) rUser.addEventListener('keypress', e => { if(e.key === 'Enter') rPass.focus(); });
     if(rPass) rPass.addEventListener('keypress', e => { if(e.key === 'Enter') handleReset(); });
     if(sInput) sInput.addEventListener('keypress', e => { if(e.key === 'Enter') searchDevice(); });
-    if(sOldInput) sOldInput.addEventListener('keypress', e => { if(e.key === 'Enter') renderOldDevices(); });
 }
 
 async function logActivity(username, actionText) {
@@ -75,11 +72,6 @@ async function handleLogin() {
     
     if (!user || !pass) {
         alert("Username dan Password wajib diisi!");
-        return;
-    }
-
-    if (!supabaseClient || SUPABASE_URL.includes('ISI_DENGAN')) {
-        alert("Konfigurasi Supabase URL dan Anon Key belum diisi di file script.js!");
         return;
     }
 
@@ -181,13 +173,13 @@ function logout() {
     currentUser = null;
     localStorage.removeItem('autopilot_current_user');
     document.getElementById('app-section').classList.add('hidden');
-    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('auth-section').classList.remove('hidden');
     document.querySelectorAll('.input-form').forEach(el => el.value = '');
     toggleAuth('login');
 }
 
 // ==========================================
-// 2. INISIALISASI & DASHBOARD SWITCHING
+// 2. INISIALISASI & DASHBOARD
 // ==========================================
 async function initApp() {
     if(!currentUser) return;
@@ -203,29 +195,12 @@ async function initApp() {
 
     await renderDevices();
     await renderOldDevices();
-    await renderSummaries();
+    await renderIncidents();
 }
 
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    
-    // Switch dashboard stats depending on tab
-    const stats1 = document.getElementById('stats-tab-1');
-    const stats2 = document.getElementById('stats-tab-2');
-
-    if (tabName === 'device') {
-        stats1.classList.remove('hidden');
-        stats2.classList.add('hidden');
-    } else if (tabName === 'old-device') {
-        stats1.classList.add('hidden');
-        stats2.classList.remove('hidden');
-        updateOldDashboardStats();
-    } else {
-        stats1.classList.add('hidden');
-        stats2.classList.add('hidden');
-    }
-
     document.getElementById(`tab-${tabName}`).classList.add('active');
     event.currentTarget.classList.add('active');
 }
@@ -241,24 +216,9 @@ async function updateDashboardStats() {
     document.getElementById('stat-deploy').innerText = devices.filter(d => d.status === 'Done deploy user').length;
 }
 
-async function updateOldDashboardStats() {
-    const { data: oldDevices } = await supabaseClient.from('old_devices').select('*');
-    if(!oldDevices) return;
-
-    document.getElementById('old-stat-total').innerText = oldDevices.length;
-    document.getElementById('old-stat-done').innerText = oldDevices.filter(d => d.status_bast === 'done').length;
-    document.getElementById('old-stat-pending').innerText = oldDevices.filter(d => d.status_bast === 'pending').length;
-    document.getElementById('old-stat-belum').innerText = oldDevices.filter(d => d.status_bast === 'belum BAST').length;
-}
-
 function setStatFilter(status) {
     document.getElementById('filter-status-select').value = status;
     renderDevices();
-}
-
-function setOldBastFilter(bast) {
-    document.getElementById('filter-bast-select').value = bast;
-    renderOldDevices();
 }
 
 function formatTanggalIndo(dateString) {
@@ -267,7 +227,6 @@ function formatTanggalIndo(dateString) {
     if (parts.length !== 3) return dateString;
     const [year, month, day] = parts;
     const d = new Date(year, month - 1, day);
-    if (isNaN(d.getTime())) return dateString;
     return d.toLocaleDateString('id-ID', {
         weekday: 'long',
         day: 'numeric',
@@ -386,7 +345,7 @@ async function saveDevice() {
         }
 
         await supabaseClient.from('devices').update({
-            nama, sn, email, team, alamat, tanggal, status, history: historyLog, updated_at: new Date()
+            nama, sn, email, team, alamat, tanggal, status, history: historyLog
         }).eq('id', id);
 
         await logActivity(currentUser.username, `Mengupdate data device SN: ${sn}`);
@@ -408,13 +367,13 @@ async function editDevice(id) {
     if(data) {
         document.getElementById('title-device').innerText = 'Edit Status & Data Deploy';
         document.getElementById('dev-id').value = data.id;
-        document.getElementById('dev-nama').value = data.nama || '';
-        document.getElementById('dev-sn').value = data.sn || '';
-        document.getElementById('dev-email').value = data.email || '';
+        document.getElementById('dev-nama').value = data.nama;
+        document.getElementById('dev-sn').value = data.sn;
+        document.getElementById('dev-email').value = data.email;
         document.getElementById('dev-team').value = data.team || '-';
-        document.getElementById('dev-alamat').value = data.alamat || '';
-        document.getElementById('dev-tgl').value = data.tanggal || new Date().toISOString().split('T')[0];
-        document.getElementById('dev-status').value = data.status || 'Belum di setup';
+        document.getElementById('dev-alamat').value = data.alamat;
+        document.getElementById('dev-tgl').value = data.tanggal;
+        document.getElementById('dev-status').value = data.status;
         document.getElementById('modal-device').classList.remove('hidden');
     }
 }
@@ -435,12 +394,29 @@ async function deleteDevice(id) {
 }
 
 // ==========================================
-// 4. REPORT STATUS DEVICE LAMA (TAMPILAN 2)
+// 4. REPORT STATUS DEVICE LAMA
 // ==========================================
 function getBastBadge(bast) {
     if(bast === 'done') return `<span class="badge badge-bast-done">Done</span>`;
     if(bast === 'pending') return `<span class="badge badge-bast-pending">Pending</span>`;
     return `<span class="badge badge-bast-belum">Belum BAST</span>`;
+}
+
+async function updateOldDashboardStats(oldList) {
+    const total = oldList.length;
+    const done = oldList.filter(d => d.status_bast === 'done').length;
+    const pending = oldList.filter(d => d.status_bast === 'pending').length;
+    const belum = oldList.filter(d => d.status_bast === 'belum BAST').length;
+
+    document.getElementById('old-stat-total').innerText = total;
+    document.getElementById('old-stat-done').innerText = done;
+    document.getElementById('old-stat-pending').innerText = pending;
+    document.getElementById('old-stat-belum').innerText = belum;
+}
+
+function setOldBastFilter(bastStatus) {
+    document.getElementById('filter-bast-select').value = bastStatus;
+    renderOldDevices();
 }
 
 async function renderOldDevices() {
@@ -451,6 +427,7 @@ async function renderOldDevices() {
     tbody.innerHTML = '';
 
     let list = oldList || [];
+    updateOldDashboardStats(list);
 
     const bastFilter = document.getElementById('filter-bast-select').value;
     if (bastFilter !== 'All') {
@@ -485,7 +462,6 @@ async function renderOldDevices() {
             </tr>
         `;
     });
-    updateOldDashboardStats();
 }
 
 async function saveOldDevice() {
@@ -523,14 +499,14 @@ async function editOldDevice(id) {
     if(data) {
         document.getElementById('title-old-device').innerText = 'Edit Status Device Lama';
         document.getElementById('old-id').value = data.id;
-        document.getElementById('old-sn').value = data.sn || '';
-        document.getElementById('old-nama').value = data.nama || '';
-        document.getElementById('old-email').value = data.email || '';
-        document.getElementById('old-lokasi').value = data.lokasi || '';
-        document.getElementById('old-divisi').value = data.divisi || '';
-        document.getElementById('old-tanggal').value = data.tanggal || new Date().toISOString().split('T')[0];
-        document.getElementById('old-pengembalian').value = data.status_pengembalian || '';
-        document.getElementById('old-bast').value = data.status_bast || 'belum BAST';
+        document.getElementById('old-sn').value = data.sn;
+        document.getElementById('old-nama').value = data.nama;
+        document.getElementById('old-email').value = data.email;
+        document.getElementById('old-lokasi').value = data.lokasi;
+        document.getElementById('old-divisi').value = data.divisi;
+        document.getElementById('old-tanggal').value = data.tanggal;
+        document.getElementById('old-pengembalian').value = data.status_pengembalian;
+        document.getElementById('old-bast').value = data.status_bast;
         document.getElementById('modal-old-device').classList.remove('hidden');
     }
 }
@@ -553,86 +529,79 @@ async function exportOldExcel() {
 }
 
 // ==========================================
-// 5. SUMMARY, INCIDENT & PROBLEM (TAMPILAN 3)
+// 5. INCIDENT, PROBLEM & CATATAN (TAB 3)
 // ==========================================
-function getSummaryBadge(kategori) {
-    if(kategori === 'Incident') return `<span class="badge badge-incident">Incident</span>`;
-    if(kategori === 'Problem Deployment') return `<span class="badge badge-problem">Problem</span>`;
-    return `<span class="badge badge-catatan">Catatan</span>`;
-}
-
-async function renderSummaries() {
-    const { data: summaries, error } = await supabaseClient.from('deploy_summaries').select('*');
+async function renderIncidents() {
+    const { data: incidents, error } = await supabaseClient.from('incident_reports').select('*');
     if (error) { console.error(error); return; }
 
-    const tbody = document.getElementById('table-summary');
+    const tbody = document.getElementById('table-incident');
     tbody.innerHTML = '';
 
-    let list = summaries || [];
-    const catFilter = document.getElementById('filter-summary-cat').value;
-    if (catFilter !== 'All') {
-        list = list.filter(s => s.kategori === catFilter);
+    let list = incidents || [];
+
+    const katFilter = document.getElementById('filter-inc-select').value;
+    if (katFilter !== 'All') {
+        list = list.filter(i => i.kategori === katFilter);
     }
 
-    list.forEach(s => {
+    const searchVal = document.getElementById('search-inc-input').value.toLowerCase().trim();
+    if (searchVal) {
+        list = list.filter(i => 
+            (i.judul && i.judul.toLowerCase().includes(searchVal)) || 
+            (i.deskripsi && i.deskripsi.toLowerCase().includes(searchVal))
+        );
+    }
+
+    list.forEach(i => {
+        let badgeColor = 'var(--primary)';
+        if(i.kategori === 'Incident') badgeColor = 'var(--danger)';
+        if(i.kategori === 'Problem Deployment') badgeColor = 'var(--warning)';
+
         tbody.innerHTML += `
             <tr>
-                <td>${getSummaryBadge(s.kategori)}</td>
-                <td><strong>${s.judul || ''}</strong></td>
-                <td>${s.deskripsi || ''}</td>
-                <td><strong>${formatTanggalIndo(s.tanggal)}</strong></td>
+                <td><span class="badge" style="background:${badgeColor}; color:#000;">${i.kategori}</span></td>
+                <td><strong>${i.judul || ''}</strong></td>
+                <td>${i.deskripsi || ''}</td>
+                <td>${formatTanggalIndo(i.tanggal)}</td>
+                <td>${i.pembuat || '-'}</td>
                 <td>
-                    <button class="btn btn-warning" style="padding:5px 6px; font-size:11px;" onclick="editSummary(${s.id})">Edit</button>
-                    <button class="btn btn-danger" style="padding:5px 6px; font-size:11px;" onclick="deleteSummary(${s.id})">Del</button>
+                    <button class="btn btn-danger" style="padding:5px 6px; font-size:11px;" onclick="deleteIncident(${i.id})">Del</button>
                 </td>
             </tr>
         `;
     });
 }
 
-async function saveSummary() {
-    const id = document.getElementById('sum-id').value;
-    const kategori = document.getElementById('sum-kategori').value;
-    const judul = document.getElementById('sum-judul').value.trim();
-    const deskripsi = document.getElementById('sum-deskripsi').value.trim();
-    const tanggal = document.getElementById('sum-tanggal').value;
+async function saveIncident() {
+    const kategori = document.getElementById('inc-kategori').value;
+    const judul = document.getElementById('inc-judul').value.trim();
+    const deskripsi = document.getElementById('inc-deskripsi').value.trim();
+    const tanggal = document.getElementById('inc-tanggal').value;
 
-    if (!judul) {
-        alert("Judul wajib diisi!");
+    if (!judul || !deskripsi) {
+        alert("Judul dan Deskripsi wajib diisi!");
         return;
     }
 
-    const data = { kategori, judul, deskripsi, tanggal };
+    const data = {
+        kategori,
+        judul,
+        deskripsi,
+        tanggal: tanggal || new Date().toISOString().split('T')[0],
+        pembuat: currentUser.username
+    };
 
-    if (id) {
-        await supabaseClient.from('deploy_summaries').update(data).eq('id', id);
-        await logActivity(currentUser.username, `Mengupdate summary: ${judul}`);
-    } else {
-        await supabaseClient.from('deploy_summaries').insert([data]);
-        await logActivity(currentUser.username, `Menambah summary baru: ${judul}`);
-    }
-
-    closeModal('modal-summary');
-    renderSummaries();
+    await supabaseClient.from('incident_reports').insert([data]);
+    await logActivity(currentUser.username, `Menambah laporan [${kategori}]: ${judul}`);
+    closeModal('modal-incident');
+    renderIncidents();
 }
 
-async function editSummary(id) {
-    const { data } = await supabaseClient.from('deploy_summaries').select('*').eq('id', id).single();
-    if(data) {
-        document.getElementById('title-summary').innerText = 'Edit Summary & Incident';
-        document.getElementById('sum-id').value = data.id;
-        document.getElementById('sum-kategori').value = data.kategori || 'Incident';
-        document.getElementById('sum-judul').value = data.judul || '';
-        document.getElementById('sum-deskripsi').value = data.deskripsi || '';
-        document.getElementById('sum-tanggal').value = data.tanggal || new Date().toISOString().split('T')[0];
-        document.getElementById('modal-summary').classList.remove('hidden');
-    }
-}
-
-async function deleteSummary(id) {
-    if(confirm("Hapus summary ini?")) {
-        await supabaseClient.from('deploy_summaries').delete().eq('id', id);
-        renderSummaries();
+async function deleteIncident(id) {
+    if(confirm("Hapus laporan incident/problem/catatan ini?")) {
+        await supabaseClient.from('incident_reports').delete().eq('id', id);
+        renderIncidents();
     }
 }
 
@@ -664,7 +633,7 @@ async function switchActivityTab(tab) {
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${d.nama}</strong><br><small class="text-muted">SN: ${d.sn}</small></td>
-                        <td><div style="max-height:60px; overflow-y:auto; background:#000; padding:4px; font-size:11px; color:#888;">${d.history || 'Belum ada riwayat.'}</div></td>
+                        <td><div class="history-container-modal">${d.history || 'Belum ada riwayat.'}</div></td>
                     </tr>
                 `;
             });
@@ -693,7 +662,37 @@ async function switchActivityTab(tab) {
 }
 
 // ==========================================
-// 7. CRUD USERS & RESET 2FA
+// 7. ADMIN TOOLS & RESET SEMUA DATA
+// ==========================================
+async function resetAllDatabaseData() {
+    if (!currentUser || currentUser.role !== 'Admin') {
+        alert("Akses ditolak! Fitur Reset Semua Data hanya dapat diakses oleh user dengan role Admin.");
+        return;
+    }
+
+    const confirmReset = confirm("PERINGATAN KERAS! Apakah kamu yakin hapus semua data? Tindakan ini akan menghapus seluruh data device, device lama, dan laporan incident secara permanen!");
+    if (!confirmReset) return;
+
+    const doubleConfirm = confirm("Konfirmasi kedua: Tindakan ini tidak dapat dibatalkan. Lanjutkan menghapus seluruh database?");
+    if (!doubleConfirm) return;
+
+    try {
+        await supabaseClient.from('devices').delete().neq('id', 0);
+        await supabaseClient.from('old_devices').delete().neq('id', 0);
+        await supabaseClient.from('incident_reports').delete().neq('id', 0);
+        
+        await logActivity(currentUser.username, "MELAKUKAN RESET SEMUA DATA DATABASE");
+        alert("Seluruh data database berhasil direset/dihapus!");
+        
+        initApp();
+    } catch (err) {
+        console.error("Gagal reset data:", err);
+        alert("Terjadi kesalahan saat menghapus database.");
+    }
+}
+
+// ==========================================
+// 8. CRUD USERS & RESET 2FA
 // ==========================================
 async function renderUsers() {
     const { data: users } = await supabaseClient.from('app_users').select('*');
@@ -759,9 +758,9 @@ async function editUser(id) {
     if(data) {
         document.getElementById('title-user').innerText = 'Edit Akses User Cloud';
         document.getElementById('usr-id').value = data.id;
-        document.getElementById('usr-name').value = data.username || '';
-        document.getElementById('usr-pass').value = data.password || '';
-        document.getElementById('usr-role').value = data.role || 'Member';
+        document.getElementById('usr-name').value = data.username;
+        document.getElementById('usr-pass').value = data.password;
+        document.getElementById('usr-role').value = data.role;
         document.getElementById('modal-user').classList.remove('hidden');
     }
 }
@@ -775,7 +774,7 @@ async function deleteUser(id, uname) {
 }
 
 // ==========================================
-// 8. MODALS & EXCEL EXPORT/IMPORT
+// 9. MODALS & EXCEL EXPORT/IMPORT
 // ==========================================
 function openModal(modalId) {
     document.getElementById(modalId).classList.remove('hidden');
@@ -800,13 +799,13 @@ function openModal(modalId) {
         document.getElementById('old-tanggal').value = new Date().toISOString().split('T')[0];
         document.getElementById('old-pengembalian').value = '';
         document.getElementById('old-bast').value = 'belum BAST';
-    } else if(modalId === 'modal-summary') {
-        document.getElementById('title-summary').innerText = 'Form Summary & Incident';
-        document.getElementById('sum-id').value = '';
-        document.getElementById('sum-kategori').value = 'Incident';
-        document.getElementById('sum-judul').value = '';
-        document.getElementById('sum-deskripsi').value = '';
-        document.getElementById('sum-tanggal').value = new Date().toISOString().split('T')[0];
+    } else if(modalId === 'modal-incident') {
+        document.getElementById('title-incident').innerText = 'Form Incident & Problem';
+        document.getElementById('inc-id').value = '';
+        document.getElementById('inc-kategori').value = 'Incident';
+        document.getElementById('inc-judul').value = '';
+        document.getElementById('inc-deskripsi').value = '';
+        document.getElementById('inc-tanggal').value = new Date().toISOString().split('T')[0];
     } else if(modalId === 'modal-user') {
         document.getElementById('title-user').innerText = 'Tambah Akun Akses Baru';
         document.getElementById('usr-id').value = '';
