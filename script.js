@@ -1,5 +1,5 @@
 // ==========================================
-// KONEKSI SUPABASE CLOUD[cite: 4]
+// KONEKSI SUPABASE CLOUD
 // ==========================================
 const SUPABASE_URL = 'https://xnfdvmxbklqelwvxzygp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZmR2bXhia2xxZWx3dnh6eWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2NDgwMzQsImV4cCI6MjEwNTIyNDAzNH0.c6rY_GA0vBjGMnUQc9xDPKSYC1sB1fNiYZU1kVbKt2Q';
@@ -13,6 +13,7 @@ try {
 
 let currentUser = null;
 
+// Cek Sesi Persisten saat Browser Dimuat
 window.addEventListener('DOMContentLoaded', () => {
     const savedUser = localStorage.getItem('autopilot_current_user');
     if (savedUser) {
@@ -32,7 +33,6 @@ function setupEnterListeners() {
     const rPass = document.getElementById('reset-pass');
     const sInput = document.getElementById('search-input');
     const sOldInput = document.getElementById('search-old-input');
-    const sIncInput = document.getElementById('search-inc-input');
 
     if(lUser) lUser.addEventListener('keypress', e => { if(e.key === 'Enter') lPass.focus(); });
     if(lPass) lPass.addEventListener('keypress', e => { if(e.key === 'Enter') handleLogin(); });
@@ -41,7 +41,6 @@ function setupEnterListeners() {
     if(rPass) rPass.addEventListener('keypress', e => { if(e.key === 'Enter') handleReset(); });
     if(sInput) sInput.addEventListener('keypress', e => { if(e.key === 'Enter') searchDevice(); });
     if(sOldInput) sOldInput.addEventListener('keypress', e => { if(e.key === 'Enter') renderOldDevices(); });
-    if(sIncInput) sIncInput.addEventListener('keypress', e => { if(e.key === 'Enter') renderIncidents(); });
 }
 
 async function logActivity(username, actionText) {
@@ -55,7 +54,7 @@ async function logActivity(username, actionText) {
 }
 
 // ==========================================
-// 1. AUTENTIKASI & LOGIN SISTEM[cite: 4]
+// 1. AUTENTIKASI & LOGIN SISTEM
 // ==========================================
 function toggleAuth(view) {
     document.getElementById('login-card').classList.add('hidden');
@@ -177,13 +176,14 @@ function logout() {
     currentUser = null;
     localStorage.removeItem('autopilot_current_user');
     document.getElementById('app-section').classList.add('hidden');
-    document.getElementById('auth-section').classList.add('flex-center');
+    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('auth-section').classList.remove('hidden');
     document.querySelectorAll('.input-form').forEach(el => el.value = '');
     toggleAuth('login');
 }
 
 // ==========================================
-// 2. INISIALISASI & DASHBOARD[cite: 4]
+// 2. INISIALISASI & DASHBOARD
 // ==========================================
 async function initApp() {
     if(!currentUser) return;
@@ -205,15 +205,16 @@ async function initApp() {
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.dashboard-stats-group').forEach(el => el.classList.add('hidden'));
+
     document.getElementById(`tab-${tabName}`).classList.add('active');
-    
-    // Aktifkan button tab visual
-    const buttons = document.querySelectorAll('.tab-btn');
-    buttons.forEach(btn => {
-        if(btn.getAttribute('onclick')?.includes(tabName)) {
-            btn.classList.add('active');
-        }
-    });
+    event.currentTarget.classList.add('active');
+
+    if (tabName === 'device') {
+        document.getElementById('dash-device').classList.remove('hidden');
+    } else if (tabName === 'old-device') {
+        document.getElementById('dash-old-device').classList.remove('hidden');
+    }
 }
 
 async function updateDashboardStats() {
@@ -227,10 +228,24 @@ async function updateDashboardStats() {
     document.getElementById('stat-deploy').innerText = devices.filter(d => d.status === 'Done deploy user').length;
 }
 
+async function updateOldDashboardStats() {
+    const { data: oldList } = await supabaseClient.from('old_devices').select('*');
+    if(!oldList) return;
+
+    document.getElementById('old-stat-total').innerText = oldList.length;
+    document.getElementById('old-stat-done').innerText = oldList.filter(d => d.status_bast === 'done').length;
+    document.getElementById('old-stat-pending').innerText = oldList.filter(d => d.status_bast === 'pending').length;
+    document.getElementById('old-stat-belum').innerText = oldList.filter(d => d.status_bast === 'belum BAST').length;
+}
+
 function setStatFilter(status) {
     document.getElementById('filter-status-select').value = status;
-    switchTab('device');
     renderDevices();
+}
+
+function setOldBastFilter(bast) {
+    document.getElementById('filter-bast-select').value = bast;
+    renderOldDevices();
 }
 
 function formatTanggalIndo(dateString) {
@@ -248,7 +263,7 @@ function formatTanggalIndo(dateString) {
 }
 
 // ==========================================
-// 3. CRUD DEVICES (DEPLOY) & VALIDASI DUPLIKASI[cite: 4]
+// 3. CRUD DEVICES (DEPLOY)
 // ==========================================
 function getStatusBadge(status) {
     if(status === 'Belum di setup') return `<span class="badge badge-belum">${status}</span>`;
@@ -357,7 +372,7 @@ async function saveDevice() {
         }
 
         await supabaseClient.from('devices').update({
-            nama, sn, email, team, alamat, tanggal, status, history: historyLog, updated_at: new Date()
+            nama, sn, email, team, alamat, tanggal, status, history: historyLog
         }).eq('id', id);
 
         await logActivity(currentUser.username, `Mengupdate data device SN: ${sn}`);
@@ -384,7 +399,7 @@ async function editDevice(id) {
         document.getElementById('dev-email').value = data.email;
         document.getElementById('dev-team').value = data.team || '-';
         document.getElementById('dev-alamat').value = data.alamat;
-        document.getElementById('dev-tgl').value = data.tanggal;
+        document.getElementById('dev-tgl').value = data.tanggal || new Date().toISOString().split('T')[0];
         document.getElementById('dev-status').value = data.status;
         document.getElementById('modal-device').classList.remove('hidden');
     }
@@ -406,7 +421,7 @@ async function deleteDevice(id) {
 }
 
 // ==========================================
-// 4. TAMPILAN KE-2: REPORT STATUS DEVICE LAMA & DASHBOARD
+// 4. REPORT STATUS DEVICE LAMA (TAMPILAN 2)
 // ==========================================
 function getBastBadge(bast) {
     if(bast === 'done') return `<span class="badge badge-bast-done">Done</span>`;
@@ -414,27 +429,14 @@ function getBastBadge(bast) {
     return `<span class="badge badge-bast-belum">Belum BAST</span>`;
 }
 
-async function updateOldDashboardStats(list) {
-    document.getElementById('old-stat-total').innerText = list.length;
-    document.getElementById('old-stat-done').innerText = list.filter(d => d.status_bast === 'done').length;
-    document.getElementById('old-stat-pending').innerText = list.filter(d => d.status_bast === 'pending').length;
-    document.getElementById('old-stat-belum').innerText = list.filter(d => d.status_bast === 'belum BAST' || !d.status_bast).length;
-}
-
-function filterOldBast(bastStatus) {
-    document.getElementById('filter-bast-select').value = bastStatus;
-    renderOldDevices();
-}
-
 async function renderOldDevices() {
     const { data: oldList, error } = await supabaseClient.from('old_devices').select('*');
     if (error) { console.error(error); return; }
 
-    let list = oldList || [];
-    updateOldDashboardStats(list);
-
     const tbody = document.getElementById('table-old-device');
     tbody.innerHTML = '';
+
+    let list = oldList || [];
 
     const bastFilter = document.getElementById('filter-bast-select').value;
     if (bastFilter !== 'All') {
@@ -469,6 +471,7 @@ async function renderOldDevices() {
             </tr>
         `;
     });
+    updateOldDashboardStats();
 }
 
 async function saveOldDevice() {
@@ -511,7 +514,7 @@ async function editOldDevice(id) {
         document.getElementById('old-email').value = data.email;
         document.getElementById('old-lokasi').value = data.lokasi;
         document.getElementById('old-divisi').value = data.divisi;
-        document.getElementById('old-tanggal').value = data.tanggal;
+        document.getElementById('old-tanggal').value = data.tanggal || new Date().toISOString().split('T')[0];
         document.getElementById('old-pengembalian').value = data.status_pengembalian;
         document.getElementById('old-bast').value = data.status_bast;
         document.getElementById('modal-old-device').classList.remove('hidden');
@@ -536,44 +539,32 @@ async function exportOldExcel() {
 }
 
 // ==========================================
-// 5. TAMPILAN KE-3: SUMMARY INCIDENT, PROBLEM DEPLOYMENT & CATATAN
+// 5. SUMMARY INCIDENT, PROBLEM & CATATAN (TAMPILAN 3)
 // ==========================================
-async function updateIncidentStats(list) {
-    document.getElementById('inc-stat-total').innerText = list.length;
-    document.getElementById('inc-stat-incident').innerText = list.filter(i => i.kategori === 'Incident').length;
-    document.getElementById('inc-stat-problem').innerText = list.filter(i => i.kategori === 'Problem Deployment').length;
-}
-
 async function renderIncidents() {
-    const { data: incList, error } = await supabaseClient.from('incidents').select('*');
+    const { data: incList, error } = await supabaseClient.from('incidents_problems').select('*');
     if (error) { console.error(error); return; }
-
-    let list = incList || [];
-    updateIncidentStats(list);
 
     const tbody = document.getElementById('table-incident');
     tbody.innerHTML = '';
 
-    const catFilter = document.getElementById('filter-inc-cat').value;
+    let list = incList || [];
+    const catFilter = document.getElementById('filter-incident-cat').value;
     if (catFilter !== 'All') {
         list = list.filter(i => i.kategori === catFilter);
     }
 
-    const searchVal = document.getElementById('search-inc-input').value.toLowerCase().trim();
-    if (searchVal) {
-        list = list.filter(i => 
-            (i.judul && i.judul.toLowerCase().includes(searchVal)) || 
-            (i.deskripsi && i.deskripsi.toLowerCase().includes(searchVal))
-        );
-    }
-
     list.forEach(i => {
-        const catBadge = i.kategori === 'Incident' ? '<span class="badge badge-belum">Incident</span>' : '<span class="badge badge-progress">Problem Deployment</span>';
+        let badgeColor = 'var(--primary)';
+        if(i.kategori === 'Incident') badgeColor = 'var(--danger)';
+        if(i.kategori === 'Problem Deployment') badgeColor = 'var(--warning)';
+
         tbody.innerHTML += `
             <tr>
-                <td>${catBadge}</td>
-                <td><strong>${i.judul || ''}</strong><br><small class="text-muted">${i.deskripsi || ''}</small></td>
-                <td><div class="history-container-modal">${i.catatan || '-'}</div></td>
+                <td><span class="badge" style="background:${badgeColor}; color:#000;">${i.kategori}</span></td>
+                <td><strong>${i.judul || ''}</strong></td>
+                <td>${i.deskripsi || ''}</td>
+                <td><span class="badge badge-setup">${i.status || 'Open'}</span></td>
                 <td><strong>${formatTanggalIndo(i.tanggal)}</strong></td>
                 <td>
                     <button class="btn btn-warning" style="padding:5px 6px; font-size:11px;" onclick="editIncident(${i.id})">Edit</button>
@@ -586,25 +577,25 @@ async function renderIncidents() {
 
 async function saveIncident() {
     const id = document.getElementById('inc-id').value;
-    const kategori = document.getElementById('inc-cat').value;
+    const kategori = document.getElementById('inc-kategori').value;
     const judul = document.getElementById('inc-judul').value.trim();
-    const deskripsi = document.getElementById('inc-desk').value.trim();
-    const catatan = document.getElementById('inc-catatan').value.trim();
-    const tanggal = document.getElementById('inc-tgl').value;
+    const deskripsi = document.getElementById('inc-deskripsi').value.trim();
+    const status = document.getElementById('inc-status').value;
+    const tanggal = document.getElementById('inc-tanggal').value;
 
     if (!judul) {
-        alert("Judul Isu wajib diisi!");
+        alert("Judul wajib diisi!");
         return;
     }
 
-    const data = { kategori, judul, deskripsi, catatan, tanggal };
+    const data = { kategori, judul, deskripsi, status, tanggal };
 
     if (id) {
-        await supabaseClient.from('incidents').update(data).eq('id', id);
-        await logActivity(currentUser.username, `Mengupdate catatan incident/problem ID: ${id}`);
+        await supabaseClient.from('incidents_problems').update(data).eq('id', id);
+        await logActivity(currentUser.username, `Mengupdate catatan/insiden: ${judul}`);
     } else {
-        await supabaseClient.from('incidents').insert([data]);
-        await logActivity(currentUser.username, `Menambah catatan incident/problem baru: ${judul}`);
+        await supabaseClient.from('incidents_problems').insert([data]);
+        await logActivity(currentUser.username, `Menambah catatan/insiden baru: ${judul}`);
     }
 
     closeModal('modal-incident');
@@ -612,28 +603,28 @@ async function saveIncident() {
 }
 
 async function editIncident(id) {
-    const { data } = await supabaseClient.from('incidents').select('*').eq('id', id).single();
+    const { data } = await supabaseClient.from('incidents_problems').select('*').eq('id', id).single();
     if(data) {
-        document.getElementById('title-incident').innerText = 'Edit Incident & Problem';
+        document.getElementById('title-incident').innerText = 'Edit Incident & Catatan';
         document.getElementById('inc-id').value = data.id;
-        document.getElementById('inc-cat').value = data.kategori;
+        document.getElementById('inc-kategori').value = data.kategori;
         document.getElementById('inc-judul').value = data.judul;
-        document.getElementById('inc-desk').value = data.deskripsi;
-        document.getElementById('inc-catatan').value = data.catatan;
-        document.getElementById('inc-tgl').value = data.tanggal;
+        document.getElementById('inc-deskripsi').value = data.deskripsi;
+        document.getElementById('inc-status').value = data.status;
+        document.getElementById('inc-tanggal').value = data.tanggal || new Date().toISOString().split('T')[0];
         document.getElementById('modal-incident').classList.remove('hidden');
     }
 }
 
 async function deleteIncident(id) {
-    if(confirm("Hapus catatan ini?")) {
-        await supabaseClient.from('incidents').delete().eq('id', id);
+    if(confirm("Hapus catatan/insiden ini?")) {
+        await supabaseClient.from('incidents_problems').delete().eq('id', id);
         renderIncidents();
     }
 }
 
 // ==========================================
-// 6. RIWAYAT AKTIVITAS & MODAL[cite: 4]
+// 6. RIWAYAT AKTIVITAS & MODAL
 // ==========================================
 async function openActivityModal() {
     document.getElementById('modal-activity').classList.remove('hidden');
@@ -660,7 +651,7 @@ async function switchActivityTab(tab) {
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${d.nama}</strong><br><small class="text-muted">SN: ${d.sn}</small></td>
-                        <td><div class="history-container-modal">${d.history || 'Belum ada riwayat.'}</div></td>
+                        <td><div style="max-height:60px; overflow-y:auto; background:#000; padding:4px; font-size:11px; color:#888;">${d.history || 'Belum ada riwayat.'}</div></td>
                     </tr>
                 `;
             });
@@ -689,7 +680,7 @@ async function switchActivityTab(tab) {
 }
 
 // ==========================================
-// 7. CRUD USERS & RESET 2FA[cite: 2, 4]
+// 7. CRUD USERS & RESET 2FA
 // ==========================================
 async function renderUsers() {
     const { data: users } = await supabaseClient.from('app_users').select('*');
@@ -771,19 +762,21 @@ async function deleteUser(id, uname) {
 }
 
 // ==========================================
-// 8. MODALS & EXCEL EXPORT/IMPORT[cite: 4]
+// 8. MODALS & EXCEL EXPORT/IMPORT
 // ==========================================
 function openModal(modalId) {
     document.getElementById(modalId).classList.remove('hidden');
+    const today = new Date().toISOString().split('T')[0];
+
     if(modalId === 'modal-device') {
-        document.getElementById('title-device').innerText = 'Tambah Data Device Baru';
+        document.getElementById('title-device').innerText = 'Form Deploy Device';
         document.getElementById('dev-id').value = '';
         document.getElementById('dev-nama').value = '';
         document.getElementById('dev-sn').value = '';
         document.getElementById('dev-email').value = '';
         document.getElementById('dev-team').value = '-';
         document.getElementById('dev-alamat').value = '';
-        document.getElementById('dev-tgl').value = new Date().toISOString().split('T')[0];
+        document.getElementById('dev-tgl').value = today;
         document.getElementById('dev-status').value = 'Belum di setup';
     } else if(modalId === 'modal-old-device') {
         document.getElementById('title-old-device').innerText = 'Form Report Status Device Lama';
@@ -793,19 +786,19 @@ function openModal(modalId) {
         document.getElementById('old-email').value = '';
         document.getElementById('old-lokasi').value = '';
         document.getElementById('old-divisi').value = '';
-        document.getElementById('old-tanggal').value = new Date().toISOString().split('T')[0];
+        document.getElementById('old-tanggal').value = today;
         document.getElementById('old-pengembalian').value = '';
         document.getElementById('old-bast').value = 'belum BAST';
     } else if(modalId === 'modal-incident') {
-        document.getElementById('title-incident').innerText = 'Form Incident & Problem';
+        document.getElementById('title-incident').innerText = 'Form Incident, Problem & Catatan';
         document.getElementById('inc-id').value = '';
-        document.getElementById('inc-cat').value = 'Incident';
+        document.getElementById('inc-kategori').value = 'Incident';
         document.getElementById('inc-judul').value = '';
-        document.getElementById('inc-desk').value = '';
-        document.getElementById('inc-catatan').value = '';
-        document.getElementById('inc-tgl').value = new Date().toISOString().split('T')[0];
+        document.getElementById('inc-deskripsi').value = '';
+        document.getElementById('inc-status').value = 'Open';
+        document.getElementById('inc-tanggal').value = today;
     } else if(modalId === 'modal-user') {
-        document.getElementById('title-user').innerText = 'Tambah Akun Akses Baru';
+        document.getElementById('title-user').innerText = 'Form Akun Login';
         document.getElementById('usr-id').value = '';
         document.getElementById('usr-name').value = '';
         document.getElementById('usr-pass').value = '';
