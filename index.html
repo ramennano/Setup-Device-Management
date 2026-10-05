@@ -17,6 +17,8 @@
 
     <!-- ==================== HALAMAN AUTENTIKASI ==================== -->
     <div id="auth-section" class="flex-center">
+        
+        <!-- Form Login -->
         <div id="login-card" class="card relative">
             <div id="hidden-demo-trigger" onclick="fillDemoAccount()" title="Hidden Demo Area"></div>
 
@@ -36,6 +38,7 @@
             </div>
         </div>
 
+        <!-- Form 2FA Authenticator -->
         <div id="mfa-card" class="card hidden">
             <h2>Verifikasi <span class="text-primary">2FA</span></h2>
             <p id="mfa-instruction" class="text-muted mb-20">Masukkan 6 digit kode dari aplikasi Authenticator Anda.</p>
@@ -52,6 +55,7 @@
             </div>
         </div>
 
+        <!-- Form Reset Password -->
         <div id="reset-card" class="card hidden">
             <h2>Reset <span class="text-warning">Password</span></h2>
             <p class="text-muted mb-20">Bypass verifikasi email. Ubah password akses langsung.</p>
@@ -77,14 +81,15 @@
             <div class="logo">AutoPilot <span>Cloud</span> <small id="login-role-badge" class="badge badge-setup"></small></div>
             <div class="nav-tabs">
                 <button class="tab-btn active" onclick="switchTab('device')">Deploy Device</button>
-                <button class="tab-btn" onclick="switchTab('old-device')">Report Status Device Lama</button>
+                <button class="tab-btn" onclick="switchTab('old-device')">Report Device Lama</button>
+                <button class="tab-btn" onclick="switchTab('incident')">Incident & Problem Note</button>
                 <button class="tab-btn" id="tab-btn-admin" onclick="switchTab('admin')">Pengaturan User</button>
                 <button class="btn btn-danger" onclick="logout()">Logout</button>
             </div>
         </nav>
 
         <div class="container">
-            <!-- DASHBOARD TAB 1 (DEPLOY) -->
+            <!-- DASHBOARD PROGRESS TAB 1 -->
             <div id="stats-tab-device" class="dashboard-stats">
                 <div class="stat-card box-total" onclick="setStatFilter('All')" style="cursor:pointer;" title="Tampilkan Semua">
                     <h3>Total Device</h3><h2 id="stat-total">0</h2>
@@ -103,8 +108,8 @@
                 </div>
             </div>
 
-            <!-- DASHBOARD TAB 2 (REPORT DEVICE LAMA) -->
-            <div id="stats-tab-old-device" class="dashboard-stats hidden">
+            <!-- DASHBOARD REPORT UNTUK TAMPILAN KE-2 (DEVICE LAMA) -->
+            <div id="stats-tab-old" class="dashboard-stats hidden" style="grid-template-columns: repeat(4, 1fr);">
                 <div class="stat-card box-total" onclick="setOldBastFilter('All')" style="cursor:pointer;">
                     <h3>Total Device Lama</h3><h2 id="old-stat-total">0</h2>
                 </div>
@@ -119,7 +124,7 @@
                 </div>
             </div>
 
-            <!-- TAB 1: DEVICE -->
+            <!-- TAB 1: DEVICE (DEPLOY) -->
             <div id="tab-device" class="tab-content active">
                 <div class="toolbar">
                     <div class="search-box">
@@ -168,19 +173,17 @@
                 </div>
             </div>
 
-            <!-- TAB 2: REPORT STATUS DEVICE LAMA (TAMPILAN KEDUA) -->
+            <!-- TAB 2: REPORT STATUS DEVICE LAMA -->
             <div id="tab-old-device" class="tab-content">
                 <div class="toolbar">
                     <div class="search-box">
-                        <input type="text" id="search-old-input" class="input-form" placeholder="Cari SN, Nama, Divisi..." style="margin: 0; width: 220px;" onkeyup="renderOldDevices()">
-                        
+                        <input type="text" id="search-old-input" class="input-form" placeholder="Cari SN, Nama, atau Divisi..." style="margin: 0; width: 240px;" onkeyup="renderOldDevices()">
                         <select id="filter-bast-select" class="input-form" style="margin: 0; width: 160px;" onchange="renderOldDevices()">
                             <option value="All">BAST: Semua</option>
                             <option value="done">BAST: Done</option>
                             <option value="pending">BAST: Pending</option>
                             <option value="belum BAST">BAST: Belum BAST</option>
                         </select>
-
                         <button class="btn btn-primary" onclick="renderOldDevices()">Cari</button>
                     </div>
                     <div class="action-box">
@@ -193,13 +196,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>SN[cite: 1, 7]</th>
-                                <th>Nama User[cite: 1, 7]</th>
-                                <th>Email[cite: 1, 7]</th>
-                                <th>Lokasi[cite: 1, 7]</th>
-                                <th>Divisi[cite: 1, 7]</th>
-                                <th>Tanggal[cite: 1, 7]</th>
-                                <th>Status Pengembalian</th>
+                                <th>SN[cite: 1]</th>
+                                <th>Nama User[cite: 1]</th>
+                                <th>Email[cite: 1]</th>
+                                <th>Lokasi[cite: 1]</th>
+                                <th>Divisi[cite: 1]</th>
+                                <th>Tanggal[cite: 1]</th>
+                                <th>Status Pengembalian Device</th>
                                 <th>Status BAST</th>
                                 <th style="width: 120px;">Aksi</th>
                             </tr>
@@ -209,7 +212,40 @@
                 </div>
             </div>
 
-            <!-- TAB 3: USER MANAGEMENT -->
+            <!-- TAB 3: NOTE SUMMARY INCIDENT & PROBLEM DEPLOYMENT -->
+            <div id="tab-incident" class="tab-content">
+                <div class="toolbar">
+                    <div class="search-box">
+                        <input type="text" id="search-incident-input" class="input-form" placeholder="Cari Catatan / Judul..." style="margin: 0; width: 240px;" onkeyup="renderIncidents()">
+                        <select id="filter-incident-cat" class="input-form" style="margin: 0; width: 180px;" onchange="renderIncidents()">
+                            <option value="All">Kategori: Semua</option>
+                            <option value="Incident">Incident</option>
+                            <option value="Problem Deployment">Problem Deployment</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="renderIncidents()">Cari</button>
+                    </div>
+                    <div class="action-box">
+                        <button class="btn btn-primary" onclick="openModal('modal-incident')">+ Tambah Catatan Note</button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 160px;">Tanggal Catat</th>
+                                <th style="width: 180px;">Judul & Kategori</th>
+                                <th>Deskripsi Note Summary (Incident / Problem Deployment)</th>
+                                <th style="width: 110px;">Status</th>
+                                <th style="width: 120px;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-incident"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 4: USER MANAGEMENT -->
             <div id="tab-admin" class="tab-content">
                 <div class="toolbar">
                     <h3 class="text-primary">Manajemen Hak Akses Login Cloud</h3>
@@ -277,32 +313,32 @@
         </div>
     </div>
 
-    <!-- MODAL OLD DEVICE -->
+    <!-- MODAL REPORT DEVICE LAMA -->
     <div id="modal-old-device" class="modal hidden">
         <div class="modal-box">
             <h2 id="title-old-device" class="text-primary mb-20">Form Report Status Device Lama</h2>
             <input type="hidden" id="old-id">
             
-            <label>SN (Serial Number)</label>
-            <input type="text" id="old-sn" class="input-form" placeholder="SN Device Lama">
+            <label>SN (Serial Number)[cite: 1]</label>
+            <input type="text" id="old-sn" class="input-form" placeholder="Nomor Seri Device Lama">
             
-            <label>Nama User</label>
+            <label>Nama User[cite: 1]</label>
             <input type="text" id="old-nama" class="input-form" placeholder="Nama User">
             
-            <label>Email</label>
+            <label>Email[cite: 1]</label>
             <input type="email" id="old-email" class="input-form" placeholder="email@domain.com">
 
-            <label>Lokasi</label>
-            <input type="text" id="old-lokasi" class="input-form" placeholder="Lokasi Kantor">
+            <label>Lokasi[cite: 1]</label>
+            <input type="text" id="old-lokasi" class="input-form" placeholder="Lokasi Kantor / Cabang">
 
-            <label>Divisi</label>
-            <input type="text" id="old-divisi" class="input-form" placeholder="Divisi">
+            <label>Divisi[cite: 1]</label>
+            <input type="text" id="old-divisi" class="input-form" placeholder="Nama Divisi">
 
-            <label>Tanggal</label>
+            <label>Tanggal[cite: 1]</label>
             <input type="date" id="old-tanggal" class="input-form">
 
             <label>Status Pengembalian Device</label>
-            <input type="text" id="old-pengembalian" class="input-form" placeholder="Contoh: Sudah Kembali / Belum">
+            <input type="text" id="old-pengembalian" class="input-form" placeholder="Contoh: Sudah dikembalikan / Belum">
 
             <label>Status BAST</label>
             <select id="old-bast" class="input-form">
@@ -314,6 +350,38 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('modal-old-device')">Batal</button>
                 <button class="btn btn-primary" onclick="saveOldDevice()">Simpan Data Lama</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NOTE INCIDENT & PROBLEM -->
+    <div id="modal-incident" class="modal hidden">
+        <div class="modal-box">
+            <h2 id="title-incident" class="text-primary mb-20">Form Note Summary Incident & Problem</h2>
+            <input type="hidden" id="inc-id">
+            
+            <label>Judul Catatan</label>
+            <input type="text" id="inc-judul" class="input-form" placeholder="Contoh: Kendala Koneksi Supabase / Setup Gagal">
+            
+            <label>Kategori Note</label>
+            <select id="inc-kategori" class="input-form">
+                <option value="Incident">Incident</option>
+                <option value="Problem Deployment">Problem Deployment</option>
+            </select>
+
+            <label>Status</label>
+            <select id="inc-status" class="input-form">
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+            </select>
+
+            <label>Deskripsi / Summary Note</label>
+            <textarea id="inc-deskripsi" class="input-form" rows="4" placeholder="Tuliskan ringkasan insiden atau problem deployment secara detail..."></textarea>
+            
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modal-incident')">Batal</button>
+                <button class="btn btn-primary" onclick="saveIncident()">Simpan Catatan</button>
             </div>
         </div>
     </div>
@@ -351,6 +419,7 @@
                 <button class="btn btn-secondary" id="btn-act-login" onclick="switchActivityTab('login')">Riwayat Login & User</button>
             </div>
 
+            <!-- Tab 1: Riwayat Status Device -->
             <div id="act-tab-device" class="act-tab-content">
                 <div class="table-wrapper" style="max-height: 380px; overflow-y: auto;">
                     <table>
@@ -365,6 +434,7 @@
                 </div>
             </div>
 
+            <!-- Tab 2: Riwayat Login & Aktivitas User -->
             <div id="act-tab-login" class="act-tab-content hidden">
                 <div class="table-wrapper" style="max-height: 380px; overflow-y: auto;">
                     <table>
